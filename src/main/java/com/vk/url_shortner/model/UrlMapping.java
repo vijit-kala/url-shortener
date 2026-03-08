@@ -1,13 +1,17 @@
 package com.vk.url_shortner.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Data
+@Getter
+@ToString
 @Table(name = "url_mapping")
+@Builder(toBuilder = true)
 public class UrlMapping {
 
     @Id
@@ -18,4 +22,16 @@ public class UrlMapping {
     private String shortKey;
     private LocalDateTime createdAt;
     private int clickCount;
+
+    protected UrlMapping() {
+    }
+
+    public UrlMapping(Long id, String originalUrl, String shortKey,
+                      LocalDateTime createdAt, int clickCount) {
+        this.id = id;
+        this.originalUrl = originalUrl;
+        this.shortKey = shortKey;
+        this.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
+        this.clickCount = clickCount;
+    }
 }

@@ -16,20 +16,29 @@ public class UrlShortenerService {
 
     public UrlMapping shortenUrl(String originalUrl) {
         String shortKey = generateShortKey();
-        UrlMapping mapping = new UrlMapping();
-        mapping.setOriginalUrl(originalUrl);
-        mapping.setShortKey(shortKey);
-        mapping.setCreatedAt(LocalDateTime.now());
-        mapping.setClickCount(0);
+        UrlMapping mapping = UrlMapping.builder()
+                .originalUrl(originalUrl)
+                .shortKey(shortKey)
+                .createdAt(LocalDateTime.now())
+                .clickCount(0)
+                .build();
         return repository.save(mapping);
     }
 
     public String getOriginalUrl(String shortKey) {
         UrlMapping mapping = repository.findByShortKey(shortKey)
                 .orElseThrow(() -> new RuntimeException("Not found"));
-        mapping.setClickCount(mapping.getClickCount() + 1);
-        repository.save(mapping);
-        return mapping.getOriginalUrl();
+
+        UrlMapping updatedMapping = UrlMapping.builder()
+                .id(mapping.getId())
+                .originalUrl(mapping.getOriginalUrl())
+                .shortKey(mapping.getShortKey())
+                .createdAt(mapping.getCreatedAt())
+                .clickCount(mapping.getClickCount() + 1)
+                .build();
+
+        repository.save(updatedMapping);
+        return updatedMapping.getOriginalUrl();
     }
 
     private String generateShortKey() {
