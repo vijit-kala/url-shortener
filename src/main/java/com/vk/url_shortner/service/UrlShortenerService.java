@@ -2,6 +2,7 @@ package com.vk.url_shortner.service;
 
 import com.vk.url_shortner.model.UrlMapping;
 import com.vk.url_shortner.repository.UrlMappingRepository;
+import com.vk.url_shortner.utils.UrlCodec;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,14 +19,18 @@ public class UrlShortenerService {
     private UrlMappingRepository repository;
 
     private final UrlCache urlCache = new UrlCache();
+    private final UrlCodec<String> codec = new UrlCodec<>();
 
     public UrlMapping shortenUrl(String originalUrl) {
 
         log.info("Shortening URL: {}", originalUrl);
 
         String shortKey = generateShortKey();
+        // encoding before saving
+        String encodedUrl = codec.encode(originalUrl);
+
         UrlMapping mapping = UrlMapping.builder()
-                .originalUrl(originalUrl)
+                .originalUrl(encodedUrl)
                 .shortKey(shortKey)
                 .createdAt(LocalDateTime.now())
                 .clickCount(0)
@@ -50,7 +55,7 @@ public class UrlShortenerService {
                     .build();
             urlCache.put(updated);
             repository.save(updated);
-            return updated.getOriginalUrl();
+            return codec.decode(updated.getOriginalUrl());
         }
 
         log.debug("Cache miss, querying DB for shortKey: {}", shortKey);
@@ -73,7 +78,7 @@ public class UrlShortenerService {
         urlCache.put(updatedMapping);
 
         log.info("Returning original URL for shortKey {}: {}", shortKey, updatedMapping.getOriginalUrl());
-        return updatedMapping.getOriginalUrl();
+        return codec.decode(updatedMapping.getOriginalUrl());
     }
 
     private String generateShortKey() {
