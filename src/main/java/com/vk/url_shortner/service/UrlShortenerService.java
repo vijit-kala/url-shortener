@@ -1,5 +1,7 @@
 package com.vk.url_shortner.service;
 
+import com.vk.url_shortner.exception.InvalidUrlException;
+import com.vk.url_shortner.exception.UrlNotFoundException;
 import com.vk.url_shortner.model.UrlMapping;
 import com.vk.url_shortner.repository.UrlMappingRepository;
 import com.vk.url_shortner.utils.UrlCodec;
@@ -24,6 +26,11 @@ public class UrlShortenerService {
     public UrlMapping shortenUrl(String originalUrl) {
 
         log.info("Shortening URL: {}", originalUrl);
+
+        if (originalUrl == null || originalUrl.isBlank()) {
+            log.error("Invalid URL input: {}", originalUrl);
+            throw new InvalidUrlException(originalUrl);
+        }
 
         String shortKey = generateShortKey();
         // encoding before saving
@@ -61,10 +68,7 @@ public class UrlShortenerService {
         log.debug("Cache miss, querying DB for shortKey: {}", shortKey);
 
         UrlMapping mapping = repository.findByShortKey(shortKey)
-                .orElseThrow(() -> {
-                    log.error("ShortKey {} not found in DB", shortKey);
-                    return new RuntimeException("Not Found");
-                });
+                .orElseThrow(() -> new UrlNotFoundException(shortKey));
 
         UrlMapping updatedMapping = UrlMapping.builder()
                 .id(mapping.getId())
