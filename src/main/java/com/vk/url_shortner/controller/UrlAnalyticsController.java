@@ -4,10 +4,7 @@ import com.vk.url_shortner.model.UrlMapping;
 import com.vk.url_shortner.service.UrlAnalyticsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
@@ -29,9 +26,19 @@ public class UrlAnalyticsController {
         return ResponseEntity.ok(service.getTopUrls(limit));
     }
 
+    @GetMapping("/top/{minClicks}")
+    public ResponseEntity<List<UrlMapping>> getPopularUrls(@PathVariable int minClicks) {
+        return ResponseEntity.ok(service.getPopularUrls(minClicks));
+    }
+
     @GetMapping("/domain")
     public ResponseEntity<Map<String, Long>> getClicksByDomain() {
         return ResponseEntity.ok(service.getClicksByDomain());
+    }
+
+    @GetMapping("/domain/{specDomain}")
+    public ResponseEntity<List<UrlMapping>> getUrlsByDomain(@PathVariable String specDomain) {
+        return ResponseEntity.ok(service.getUrlsByDomain(specDomain));
     }
 
 }
