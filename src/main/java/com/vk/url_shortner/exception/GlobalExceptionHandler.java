@@ -1,7 +1,5 @@
-package com.vk.url_shortner.controller;
+package com.vk.url_shortner.exception;
 
-import com.vk.url_shortner.exception.InvalidUrlException;
-import com.vk.url_shortner.exception.UrlNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;

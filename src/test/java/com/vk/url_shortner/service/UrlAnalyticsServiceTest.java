@@ -87,6 +87,48 @@ class UrlAnalyticsServiceTest {
         assertIterableEquals(List.of(example), urls);
     }
 
+    @Test
+    void groupByShouldCountMappingsPerClassifierValue() {
+        UrlAnalyticsService service = serviceWithMappings(
+                mapping(1L, "a", "https://example.com/one", 1),
+                mapping(2L, "b", "https://example.com/two", 2),
+                mapping(3L, "c", "https://openai.com/three", 3)
+        );
+
+        Map<String, Long> grouped = service.groupBy(mapping -> mapping.getOriginalUrl().contains("example.com")
+                ? "example"
+                : "other");
+
+        assertEquals(Map.of("example", 2L, "other", 1L), grouped);
+    }
+
+    @Test
+    void aggregateByShouldSumClicksPerClassifierValue() {
+        UrlAnalyticsService service = serviceWithMappings(
+                mapping(1L, "a", "https://example.com/one", 3),
+                mapping(2L, "b", "https://example.com/two", 4),
+                mapping(3L, "c", "https://openai.com/three", 6)
+        );
+
+        Map<String, Integer> aggregated = service.aggregateBy(mapping -> mapping.getOriginalUrl().contains("example.com")
+                ? "example"
+                : "other");
+
+        assertEquals(Map.of("example", 7, "other", 6), aggregated);
+    }
+
+    @Test
+    void getTopShouldUseProvidedComparatorBeforeApplyingLimit() {
+        UrlMapping earliest = mapping(1L, "early", "https://example.com/early", 2);
+        UrlMapping latest = mapping(2L, "late", "https://example.com/late", 5);
+        UrlMapping middle = mapping(3L, "mid", "https://example.com/mid", 3);
+        UrlAnalyticsService service = serviceWithMappings(earliest, latest, middle);
+
+        List<UrlMapping> top = service.getTop(2, java.util.Comparator.comparing(UrlMapping::getCreatedAt).reversed());
+
+        assertIterableEquals(List.of(middle, latest), top);
+    }
+
     @SafeVarargs
     private static UrlAnalyticsService serviceWithMappings(UrlMapping... mappings) {
         UrlMappingRepository repository = mock(UrlMappingRepository.class);
@@ -95,6 +137,12 @@ class UrlAnalyticsServiceTest {
     }
 
     private static UrlMapping mapping(Long id, String shortKey, String originalUrl, int clickCount) {
-        return new UrlMapping(id, originalUrl, shortKey, LocalDateTime.of(2026, 3, 13, 8, 0), clickCount);
+        return new UrlMapping(
+                id,
+                originalUrl,
+                shortKey,
+                LocalDateTime.of(2026, 3, 13, 8, 0).plusMinutes(id),
+                clickCount
+        );
     }
 }
