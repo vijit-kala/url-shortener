@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -53,6 +54,26 @@ public class UrlAnalyticsService {
 
     public List<UrlMapping> getUrlsByDomain(String domain) {
         return filterUrls(UrlFilters.belongsToDomain(domain));
+    }
+
+    public <R> Map<R, Long> groupBy(Function<UrlMapping, R> classifier) {
+        return repository.findAll().stream()
+                .collect(Collectors.groupingBy(classifier, Collectors.counting()));
+    }
+
+    public <R> Map<R, Integer> aggregateBy(Function<UrlMapping, R> classifier) {
+        return repository.findAll().stream()
+                .collect(Collectors.groupingBy(
+                        classifier,
+                        Collectors.summingInt(UrlMapping::getClickCount)
+                ));
+    }
+
+    public List<UrlMapping> getTop(int limit, Comparator<UrlMapping> comparator) {
+        return repository.findAll().stream()
+                .sorted(comparator)
+                .limit(limit)
+                .collect(Collectors.toList());
     }
 
     private String extractDomain(String url) {
