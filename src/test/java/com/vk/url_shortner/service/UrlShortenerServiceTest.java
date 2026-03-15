@@ -15,6 +15,7 @@ import com.vk.url_shortner.model.UrlMapping;
 import com.vk.url_shortner.repository.UrlMappingRepository;
 import com.vk.url_shortner.utils.UrlCodec;
 import java.time.LocalDateTime;
+import java.util.concurrent.CompletionException;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -112,6 +113,58 @@ class UrlShortenerServiceTest {
         when(repository.findByShortKey("missing")).thenReturn(Optional.empty());
 
         assertThrows(UrlNotFoundException.class, () -> service.getOriginalUrl("missing"));
+    }
+
+    @Test
+    void getOriginalUrlAsyncShouldUseCacheWhenAvailable() {
+        UrlMappingRepository repository = repositoryMock();
+        UrlShortenerService service = serviceWithRepository(repository);
+        UrlMapping cached = mapping(11L, "async001", codec.encode("https://example.com/async-cache"), 4);
+        UrlCache cache = (UrlCache) ReflectionTestUtils.getField(service, "urlCache");
+        cache.put(cached);
+        ArgumentCaptor<UrlMapping> mappingCaptor = ArgumentCaptor.forClass(UrlMapping.class);
+        when(repository.save(any(UrlMapping.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        String originalUrl = service.getOriginalUrlAsync("async001").join();
+
+        assertEquals("https://example.com/async-cache", originalUrl);
+        verify(repository, never()).findByShortKey("async001");
+        verify(repository).save(mappingCaptor.capture());
+        assertEquals(5, mappingCaptor.getValue().getClickCount());
+        assertEquals(5, cache.get("async001").orElseThrow().getClickCount());
+    }
+
+    @Test
+    void getOriginalUrlAsyncShouldLoadFromRepositoryOnCacheMiss() {
+        UrlMappingRepository repository = repositoryMock();
+        UrlShortenerService service = serviceWithRepository(repository);
+        UrlMapping stored = mapping(12L, "async002", codec.encode("https://example.com/async-db"), 1);
+        ArgumentCaptor<UrlMapping> mappingCaptor = ArgumentCaptor.forClass(UrlMapping.class);
+        when(repository.findByShortKey("async002")).thenReturn(Optional.of(stored));
+        when(repository.save(any(UrlMapping.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        String originalUrl = service.getOriginalUrlAsync("async002").join();
+
+        assertEquals("https://example.com/async-db", originalUrl);
+        verify(repository).findByShortKey("async002");
+        verify(repository).save(mappingCaptor.capture());
+        assertEquals(2, mappingCaptor.getValue().getClickCount());
+        UrlCache cache = (UrlCache) ReflectionTestUtils.getField(service, "urlCache");
+        assertEquals(2, cache.get("async002").orElseThrow().getClickCount());
+    }
+
+    @Test
+    void getOriginalUrlAsyncShouldThrowWhenShortKeyDoesNotExist() {
+        UrlMappingRepository repository = repositoryMock();
+        UrlShortenerService service = serviceWithRepository(repository);
+        when(repository.findByShortKey("async-missing")).thenReturn(Optional.empty());
+
+        CompletionException exception = assertThrows(
+                CompletionException.class,
+                () -> service.getOriginalUrlAsync("async-missing").join()
+        );
+
+        assertTrue(exception.getCause() instanceof UrlNotFoundException);
     }
 
     private static UrlShortenerService serviceWithRepository() {
