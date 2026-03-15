@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api")
@@ -31,5 +32,11 @@ public class UrlShortenerController {
         return ResponseEntity.status(HttpStatus.FOUND)
                 .header(HttpHeaders.LOCATION, originalUrl)
                 .build();
+    }
+
+    @GetMapping("/async/{shortKey}")
+    public CompletableFuture<ResponseEntity<String>> getOriginalUrlAsync(@PathVariable String shortKey) {
+        return service.getOriginalUrlAsync(shortKey)
+                .thenApply(ResponseEntity::ok);
     }
 }

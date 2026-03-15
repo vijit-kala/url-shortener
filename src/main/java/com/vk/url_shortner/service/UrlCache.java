@@ -5,10 +5,11 @@ import com.vk.url_shortner.model.UrlMapping;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class UrlCache {
 
-    private final Map<String, UrlMapping> cache = new HashMap<>();
+    private final ConcurrentHashMap<String, UrlMapping> cache = new ConcurrentHashMap<>();
 
     public void put(UrlMapping mapping) {
         cache.put(mapping.getShortKey(), mapping);

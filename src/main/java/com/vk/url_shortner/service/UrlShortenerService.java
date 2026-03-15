@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -83,6 +84,32 @@ public class UrlShortenerService {
 
         log.info("Returning original URL for shortKey {}: {}", shortKey, updatedMapping.getOriginalUrl());
         return codec.decode(updatedMapping.getOriginalUrl());
+    }
+
+    public CompletableFuture<String> getOriginalUrlAsync(String shortKey) {
+        return CompletableFuture.supplyAsync(() -> {
+            Optional<UrlMapping> cached = urlCache.get(shortKey);
+            if (cached.isPresent()) {
+                UrlMapping updated = cached.get().toBuilder()
+                        .clickCount(cached.get().getClickCount() + 1)
+                        .build();
+
+                urlCache.put(updated);
+                repository.save(updated);
+                return codec.decode(updated.getOriginalUrl());
+            }
+
+            UrlMapping mapping = repository.findByShortKey(shortKey)
+                    .orElseThrow(() -> new UrlNotFoundException(shortKey));
+
+            UrlMapping updatedMapping = mapping.toBuilder()
+                    .clickCount(mapping.getClickCount() + 1)
+                    .build();
+
+            repository.save(updatedMapping);
+            urlCache.put(updatedMapping);
+            return codec.decode(updatedMapping.getOriginalUrl());
+        });
     }
 
     private String generateShortKey() {
