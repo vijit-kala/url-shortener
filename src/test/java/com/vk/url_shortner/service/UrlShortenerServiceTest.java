@@ -16,6 +16,7 @@ import com.vk.url_shortner.repository.UrlMappingRepository;
 import com.vk.url_shortner.utils.UrlCodec;
 import java.time.LocalDateTime;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -113,6 +114,7 @@ class UrlShortenerServiceTest {
         when(repository.findByShortKey("missing")).thenReturn(Optional.empty());
 
         assertThrows(UrlNotFoundException.class, () -> service.getOriginalUrl("missing"));
+        verify(repository, never()).save(any(UrlMapping.class));
     }
 
     @Test
@@ -165,6 +167,7 @@ class UrlShortenerServiceTest {
         );
 
         assertTrue(exception.getCause() instanceof UrlNotFoundException);
+        verify(repository, never()).save(any(UrlMapping.class));
     }
 
     private static UrlShortenerService serviceWithRepository() {
@@ -172,7 +175,8 @@ class UrlShortenerServiceTest {
     }
 
     private static UrlShortenerService serviceWithRepository(UrlMappingRepository repository) {
-        UrlShortenerService service = new UrlShortenerService();
+        Executor executor = Runnable::run;
+        UrlShortenerService service = new UrlShortenerService(executor);
         ReflectionTestUtils.setField(service, "repository", repository);
         return service;
     }
