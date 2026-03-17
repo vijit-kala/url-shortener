@@ -8,11 +8,13 @@ import com.vk.url_shortner.utils.UrlCodec;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 @Service
 @Slf4j
@@ -23,6 +25,11 @@ public class UrlShortenerService {
 
     private final UrlCache urlCache = new UrlCache();
     private final UrlCodec<String> codec = new UrlCodec<>();
+    private final Executor urlExecutor;
+
+    public UrlShortenerService(@Qualifier("urlExecutor") Executor urlExecutor) {
+        this.urlExecutor = urlExecutor;
+    }
 
     public UrlMapping shortenUrl(String originalUrl) {
 
@@ -109,7 +116,7 @@ public class UrlShortenerService {
             repository.save(updatedMapping);
             urlCache.put(updatedMapping);
             return codec.decode(updatedMapping.getOriginalUrl());
-        });
+        }, urlExecutor);
     }
 
     private String generateShortKey() {

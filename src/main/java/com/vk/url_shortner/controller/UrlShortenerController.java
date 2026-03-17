@@ -1,6 +1,7 @@
 package com.vk.url_shortner.controller;
 
 import com.vk.url_shortner.model.UrlMapping;
+import com.vk.url_shortner.service.RateLimitedService;
 import com.vk.url_shortner.service.UrlShortenerService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,9 @@ public class UrlShortenerController {
     @Autowired
     private UrlShortenerService service;
 
+    @Autowired
+    private RateLimitedService rateLimitedService;
+
     @PostMapping("/shorten")
     public ResponseEntity<String> shorten(@RequestBody String originalUrl) {
         UrlMapping mapping = service.shortenUrl(originalUrl);
@@ -35,8 +39,11 @@ public class UrlShortenerController {
     }
 
     @GetMapping("/async/{shortKey}")
-    public CompletableFuture<ResponseEntity<String>> getOriginalUrlAsync(@PathVariable String shortKey) {
-        return service.getOriginalUrlAsync(shortKey)
-                .thenApply(ResponseEntity::ok);
+    public ResponseEntity<String> getOriginalUrlAsync(@PathVariable String shortKey) {
+        if(!rateLimitedService.tryAcquire()) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body("Rate limit exceeded, try again later");
+        }
+        return ResponseEntity.ok(service.getOriginalUrlAsync(shortKey).join());
     }
 }
