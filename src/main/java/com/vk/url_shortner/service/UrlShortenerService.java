@@ -26,9 +26,11 @@ public class UrlShortenerService {
     private final UrlCache urlCache = new UrlCache();
     private final UrlCodec<String> codec = new UrlCodec<>();
     private final Executor urlExecutor;
+    private final AnalyticsMetrics metrics;
 
-    public UrlShortenerService(@Qualifier("urlExecutor") Executor urlExecutor) {
+    public UrlShortenerService(@Qualifier("urlExecutor") Executor urlExecutor, AnalyticsMetrics metrics) {
         this.urlExecutor = urlExecutor;
+        this.metrics = metrics;
     }
 
     public UrlMapping shortenUrl(String originalUrl) {
@@ -37,6 +39,7 @@ public class UrlShortenerService {
 
         if (originalUrl == null || originalUrl.isBlank()) {
             log.error("Invalid URL input: {}", originalUrl);
+            metrics.recordInvalidUrl();
             throw new InvalidUrlException(originalUrl);
         }
 
@@ -53,6 +56,7 @@ public class UrlShortenerService {
         UrlMapping saved = repository.save(mapping);
         urlCache.put(saved);
 
+        metrics.recordUrlCreated();
         log.debug("Saved UrlMapping: {}", saved);
         return saved;
     }
@@ -65,6 +69,7 @@ public class UrlShortenerService {
         Optional<UrlMapping> cached = urlCache.get(shortKey);
         if (cached.isPresent()) {
             log.debug("Cache hit for shortKey: {}", shortKey);
+            metrics.recordCacheHit();
             UrlMapping updated = cached.get().toBuilder()
                     .clickCount(cached.get().getClickCount() + 1)
                     .build();
@@ -74,6 +79,7 @@ public class UrlShortenerService {
         }
 
         log.debug("Cache miss, querying DB for shortKey: {}", shortKey);
+        metrics.recordCacheMiss();
 
         UrlMapping mapping = repository.findByShortKey(shortKey)
                 .orElseThrow(() -> new UrlNotFoundException(shortKey));
@@ -89,6 +95,7 @@ public class UrlShortenerService {
         repository.save(updatedMapping);
         urlCache.put(updatedMapping);
 
+        metrics.recordClick(shortKey);
         log.info("Returning original URL for shortKey {}: {}", shortKey, updatedMapping.getOriginalUrl());
         return codec.decode(updatedMapping.getOriginalUrl());
     }
@@ -97,6 +104,8 @@ public class UrlShortenerService {
         return CompletableFuture.supplyAsync(() -> {
             Optional<UrlMapping> cached = urlCache.get(shortKey);
             if (cached.isPresent()) {
+                metrics.recordCacheHit();
+
                 UrlMapping updated = cached.get().toBuilder()
                         .clickCount(cached.get().getClickCount() + 1)
                         .build();
@@ -105,6 +114,8 @@ public class UrlShortenerService {
                 repository.save(updated);
                 return codec.decode(updated.getOriginalUrl());
             }
+
+            metrics.recordCacheMiss();
 
             UrlMapping mapping = repository.findByShortKey(shortKey)
                     .orElseThrow(() -> new UrlNotFoundException(shortKey));
