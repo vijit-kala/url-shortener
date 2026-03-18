@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,6 +32,7 @@ class UrlShortenerServiceTest {
         UrlShortenerService service = serviceWithRepository();
 
         assertThrows(InvalidUrlException.class, () -> service.shortenUrl(null));
+        verify(metrics(service)).recordInvalidUrl();
     }
 
     @Test
@@ -38,6 +40,7 @@ class UrlShortenerServiceTest {
         UrlShortenerService service = serviceWithRepository();
 
         assertThrows(InvalidUrlException.class, () -> service.shortenUrl("   "));
+        verify(metrics(service)).recordInvalidUrl();
     }
 
     @Test
@@ -67,6 +70,7 @@ class UrlShortenerServiceTest {
         assertEquals(8, persisted.getShortKey().length());
         assertTrue(((UrlCache) ReflectionTestUtils.getField(service, "urlCache")).contains(saved.getShortKey()));
         assertEquals(99L, saved.getId());
+        verify(metrics(service)).recordUrlCreated();
     }
 
     @Test
@@ -86,6 +90,7 @@ class UrlShortenerServiceTest {
         verify(repository).save(mappingCaptor.capture());
         assertEquals(3, mappingCaptor.getValue().getClickCount());
         assertEquals(3, cache.get("abc12345").orElseThrow().getClickCount());
+        verify(metrics(service)).recordCacheHit();
     }
 
     @Test
@@ -105,6 +110,8 @@ class UrlShortenerServiceTest {
         assertEquals(6, mappingCaptor.getValue().getClickCount());
         UrlCache cache = (UrlCache) ReflectionTestUtils.getField(service, "urlCache");
         assertEquals(6, cache.get("miss1234").orElseThrow().getClickCount());
+        verify(metrics(service)).recordCacheMiss();
+        verify(metrics(service)).recordClick("miss1234");
     }
 
     @Test
@@ -134,6 +141,7 @@ class UrlShortenerServiceTest {
         verify(repository).save(mappingCaptor.capture());
         assertEquals(5, mappingCaptor.getValue().getClickCount());
         assertEquals(5, cache.get("async001").orElseThrow().getClickCount());
+        verify(metrics(service)).recordCacheHit();
     }
 
     @Test
@@ -153,6 +161,7 @@ class UrlShortenerServiceTest {
         assertEquals(2, mappingCaptor.getValue().getClickCount());
         UrlCache cache = (UrlCache) ReflectionTestUtils.getField(service, "urlCache");
         assertEquals(2, cache.get("async002").orElseThrow().getClickCount());
+        verify(metrics(service)).recordCacheMiss();
     }
 
     @Test
@@ -176,13 +185,17 @@ class UrlShortenerServiceTest {
 
     private static UrlShortenerService serviceWithRepository(UrlMappingRepository repository) {
         Executor executor = Runnable::run;
-        UrlShortenerService service = new UrlShortenerService(executor);
+        UrlShortenerService service = new UrlShortenerService(executor, mock(AnalyticsMetrics.class));
         ReflectionTestUtils.setField(service, "repository", repository);
         return service;
     }
 
+    private static AnalyticsMetrics metrics(UrlShortenerService service) {
+        return (AnalyticsMetrics) ReflectionTestUtils.getField(service, "metrics");
+    }
+
     private static UrlMappingRepository repositoryMock() {
-        return org.mockito.Mockito.mock(UrlMappingRepository.class);
+        return mock(UrlMappingRepository.class);
     }
 
     private static UrlMapping mapping(Long id, String shortKey, String encodedUrl, int clickCount) {
