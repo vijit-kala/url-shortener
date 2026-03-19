@@ -1,14 +1,12 @@
-# Use official OpenJDK image
-FROM eclipse-temurin:21-jdk-alpine
-
-# Set working directory
+# Stage 1: Build JAR
+FROM maven:3.9.6-eclipse-temurin-21 AS builder
 WORKDIR /app
+COPY . .
+RUN mvn clean package -DskipTests
 
-# Copy Maven build output (JAR file)
-COPY target/*.jar app.jar
-
-# Expose port (matches your Spring Boot server.port, default 8080)
+# Stage 2: Run JAR
+FROM eclipse-temurin:21-jdk-alpine
+WORKDIR /app
+COPY --from=builder /app/target/*.jar app.jar
 EXPOSE 8080
-
-# Run the JAR
 ENTRYPOINT ["java","-jar","app.jar"]
